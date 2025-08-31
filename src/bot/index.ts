@@ -1,4 +1,5 @@
 import { runBot } from "../playwright/runBot";
+import { createBotApiServer } from "./server";
 
 // immediately runs bot logic (launchBot.ts specifies to run this file)
 (async () => {
@@ -12,8 +13,11 @@ import { runBot } from "../playwright/runBot";
   }
 
   try {
-    const meetingId = await runBot(url);
+    const {meetingId, page} = await runBot(url);
     console.log(`Bot finished, meetingId=${meetingId}`);
+
+    // เรียก API Server เพื่อให้ bot รอรับคำสั่งส่งข้อความ
+    createBotApiServer(page);
 
     // send job completion to backend to summarize and update
     if (jobId) {

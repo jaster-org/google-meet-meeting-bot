@@ -27,4 +27,6 @@ RUN echo "🔧 CACHEBUST=$CACHEBUST – building bot…" \
  && npx tsc --project src/bot/tsconfig.json --pretty false \
  && echo "✅ build done; index.js ⇒" && ls -l dist/bot/index.js
 
+ EXPOSE 3002
+
  CMD ["xvfb-run", "-a", "node", "dist/bot/index.js"]

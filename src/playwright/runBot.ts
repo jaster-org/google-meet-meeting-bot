@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Page } from "playwright";
 import { Segment } from "src/models";
 
+
 // bot will leave the meeting immediately if it hears any of the following phrases
 const EXIT_PHRASES = [
   "notetaker, please leave",
@@ -22,7 +23,7 @@ const LEAVE_BANNER_SEL =
   'body > div[role="heading"]:has-text("You’ve left the call")';
 
 // launches broswer, joins Google Meet, records captions
-export async function runBot(url: string): Promise<string> {
+export async function runBot(url: string): Promise<{ meetingId: string; page: Page }>{
   const meetingId = uuidv4();
   const createdAt = new Date();
 
@@ -83,7 +84,7 @@ export async function runBot(url: string): Promise<string> {
 
 
     await context.tracing.stop({ path: "run.zip" });
-    return mid;
+    return {mid, page};
   } catch (err) {
     throw new Error(`Run Bot error: ${err}`);
   }
@@ -615,7 +616,7 @@ async function selectCaptionsLanguage(page: Page, language: string): Promise<voi
  * @param page - Playwright Page object
  * @param message - ข้อความที่ต้องการส่ง
  */
-async function sendMessageInChat(page: Page, message: string) {
+export async function sendMessageInChat(page: Page, message: string) {
   const chatButton = page.getByRole('button', { name: 'Chat with everyone' });
   await expect(chatButton).toBeVisible();
   console.log('พบปุ่ม Chat with everyone และกำลังคลิก...');
