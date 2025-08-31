@@ -1,18 +1,18 @@
-version: "3.8"
+# version: "3.8"
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: meetingbot-db
-    environment:
-      POSTGRES_USER: meetingbot
-      POSTGRES_PASSWORD: supersecret
-      POSTGRES_DB: meetingbotpoc
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks: [meetingbot]
+  # postgres:
+  #   image: postgres:15
+  #   container_name: meetingbot-db
+  #   environment:
+  #     POSTGRES_USER: meetingbot
+  #     POSTGRES_PASSWORD: supersecret
+  #     POSTGRES_DB: meetingbotpoc
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   networks: [meetingbot]
 
   backend:
     build:
@@ -24,7 +24,7 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
+      # - postgres
       - bot
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -38,8 +38,8 @@ services:
     entrypoint: ["true"]
     networks: [meetingbot]
 
-volumes:
-  pgdata:
+# volumes:
+#   pgdata:
 
 networks:
   meetingbot:

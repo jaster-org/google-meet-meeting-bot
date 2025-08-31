@@ -1,4 +1,5 @@
 import { BrowserContext, chromium } from "playwright";
+import { expect } from '@playwright/test';
 import { saveTranscriptBatch } from "../storage";
 import { v4 as uuidv4 } from "uuid";
 import { Page } from "playwright";
@@ -72,9 +73,14 @@ export async function runBot(url: string): Promise<string> {
     await ensureCaptionsOn(page);
     console.log("captions visible");
 
+    await selectCaptionsLanguage(page, "Thai (Thailand)"); // หรือ "ไทย" หรือภาษาที่ต้องการ
+    console.log("captions set language to Thai (Thailand)");
+
+    await sendMessageInChat(page, 'ฉันพร้อมแล้วค่ะ');
     // scrape captions
     const mid = await scrapeCaptions(page, meetingId, createdAt);
     console.log("done scraping. Returning meetingId.");
+
 
     await context.tracing.stop({ path: "run.zip" });
     return mid;
@@ -486,4 +492,66 @@ async function ensureCaptionsOn(page: Page, timeoutMs = 60_000) {
   await page.screenshot({ path });
   console.error(`captions could not be enabled – see ${path}`);
   throw new Error("could not enable captions using Shift+C or button");
+}
+
+async function selectCaptionsLanguage(page: Page, language: string): Promise<void> {
+  console.log('Starting to select captions language via Settings dialog...');
+
+  const moreOptionsButton = page
+    .getByRole('region', { name: 'Call controls' })
+    .getByLabel('More options')
+    .filter({ visible: true });
+  console.log('Clicking More options button');
+  await moreOptionsButton.first().click();
+
+  const settingsMenuItem = page.getByRole('menuitem', { name: 'Settings' });
+  await expect(settingsMenuItem).toBeVisible();
+  console.log('Clicking Settings menu item');
+  await settingsMenuItem.click();
+
+  const captionsTab = page.getByRole('tab', { name: 'Captions' });
+  await expect(captionsTab).toBeVisible();
+  console.log('Clicking Captions tab');
+  await captionsTab.click();
+
+  const languageCombo = page.getByRole('combobox', { name: 'Language of the meeting' }).locator('div');
+  await expect(languageCombo).toBeVisible();
+  console.log('Opening language combobox');
+  await languageCombo.click();
+
+  const thaiOption = page.getByRole('option', { name: language });
+  await expect(thaiOption).toBeVisible();
+  console.log(`Set to "${language}"`);
+  await thaiOption.click();
+
+  const closeDialogButton = page.getByRole('button', { name: 'Close dialog' });
+  await expect(closeDialogButton).toBeVisible();
+  console.log('Closing settings dialog');
+  await closeDialogButton.click();
+
+  console.log(`Captions language successfully set to "${language}" via Settings dialog.`);
+}
+
+/**
+ * ฟังก์ชันส่งข้อความในแชท Google Meet พร้อมแสดงสถานะใน console
+ * @param page - Playwright Page object
+ * @param message - ข้อความที่ต้องการส่ง
+ */
+async function sendMessageInChat(page: Page, message: string) {
+  const chatButton = page.getByRole('button', { name: 'Chat with everyone' });
+  await expect(chatButton).toBeVisible();
+  console.log('พบปุ่ม Chat with everyone และกำลังคลิก...');
+  await chatButton.click();
+
+  const chatInput = page.getByRole('textbox', { name: 'Send a message' });
+  await expect(chatInput).toBeVisible();
+  console.log(`กรอกข้อความ: "${message}"`);
+  await chatInput.fill(message);
+
+  const sendMessageButton = page.getByRole('button', { name: 'Send a message' });
+  await expect(sendMessageButton).toBeVisible();
+  console.log('กดปุ่ม Send a message เพื่อส่งข้อความ...');
+  await sendMessageButton.click();
+
+  console.log('ส่งข้อความเรียบร้อยแล้ว');
 }
