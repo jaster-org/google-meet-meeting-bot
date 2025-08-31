@@ -102,6 +102,9 @@ async function scrapeCaptions(
   const segments: Segment[] = [];
   const activeSegments = new Map<string, Segment>();
 
+  // สำหรับเก็บข้อความ chat ถ้าต้องการ
+  const chatMessages: { sender: string; text: string }[] = [];
+
   // filter system msgs
   const isNotRealCaption = (text: string) =>
     /you left the meeting|return to home screen|leave call|feedback|audio and video|learn more/.test(
@@ -151,6 +154,29 @@ async function scrapeCaptions(
         const finalSegments = Array.from(activeSegments.values());
         await saveTranscriptBatch(meetingId, createdAt, finalSegments, true);
       }
+    },
+  );
+
+
+    // ฟังก์ชันรับ Chat จากฝั่ง browser
+  await page.exposeFunction(
+    "onChat",
+    async (sender: string, text: string) => {
+      const chatText = text.trim();
+      if (!chatText) return;
+
+      const normalized = chatText.toLowerCase();
+      const isExit = EXIT_PHRASES.some((p) => normalized.includes(p));
+      if (isExit) {
+        console.log("Exit phrase heard (chat) — hanging up");
+        exitRequested = true;
+      }
+
+      // เก็บข้อความ chat ไว้ หรือประมวลผลตามต้องการ
+      chatMessages.push({ sender, text: chatText });
+
+      // ตัวอย่าง log
+      console.log(`[Chat] ${sender}: ${chatText}`);
     },
   );
 
@@ -209,6 +235,58 @@ async function scrapeCaptions(
           m.target?.parentElement instanceof HTMLElement
         ) {
           send(m.target.parentElement);
+        }
+      }
+    }).observe(document.body, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+  });
+
+  // inject observer ดักจับ chat และส่งไป onChat
+  await page.waitForSelector('div[jsname="xySENc"]');
+  await page.evaluate(() => {
+    let lastSender = 'Unknown Sender';
+
+    function getSender(node: HTMLElement): string {
+      const senderElem = node.querySelector('.poVWob');
+      return senderElem?.textContent?.trim() || lastSender;
+    }
+
+    function getText(node: HTMLElement): string {
+      const textElem = node.querySelector('div[jsname="dTKtvb"]');
+      return textElem?.textContent?.trim() || '';
+    }
+
+    function sendChat(node: HTMLElement): void {
+      const sender = getSender(node);
+      const text = getText(node);
+      if (text && text.toLowerCase() !== sender.toLowerCase()) {
+        // @ts-expect-error
+        window.onChat?.(sender, text);
+        lastSender = sender;
+      }
+    }
+
+    new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node instanceof HTMLElement) {
+            if (node.classList.contains('Ss4fHf')) {
+              sendChat(node);
+            }
+          }
+        }
+
+        if (
+          mutation.type === 'characterData' &&
+          mutation.target?.parentElement instanceof HTMLElement
+        ) {
+          const parent = mutation.target.parentElement;
+          if (parent.classList.contains('Ss4fHf')) {
+            sendChat(parent);
+          }
         }
       }
     }).observe(document.body, {
