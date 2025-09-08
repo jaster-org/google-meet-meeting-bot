@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "backend",
-    "frontend",
-    "playwright",
-    "bot"
+    "src/backend",
+    "src/frontend",
+    "src/playwright",
+    "src/bot"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
