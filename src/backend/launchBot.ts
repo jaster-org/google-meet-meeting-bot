@@ -7,8 +7,7 @@ const docker = new Docker();
 
 // launch Docker container to run mtg bot
 export async function launchBotContainer(meetingUrl: string, jobId: string) {
-
-   // ดึง path หลัง domain https://meet.google.com/
+  // ดึง path หลัง domain https://meet.google.com/
   let meetingCode = "";
   try {
     const urlObj = new URL(meetingUrl);

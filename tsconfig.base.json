@@ -11,7 +11,8 @@
     "baseUrl": ".",
     "paths": {
       "@utils/*": ["utils/*"]
-    }
+    },
+    "typeRoots": ["node_modules/@types"]
   },
   "exclude": ["node_modules", "dist"]
 }

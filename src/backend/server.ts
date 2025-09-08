@@ -11,7 +11,7 @@ import { launchBotContainer } from "./launchBot";
 
 const app = express();
 
-const botEndpoints: Record<string, string>
+const botEndpoints: Record<string, string> = {};
 // turn on CORS for frontend at localhost:5173
 app.use(
   cors({
@@ -45,7 +45,7 @@ app.post("/submit-link", async (req, res) => {
     const job = await createMeetingJob(url);
     const containername = await launchBotContainer(url, job.id);
 
-    botEndpoints[containername] = `http://${containername}:3002`
+    botEndpoints[containername] = `http://${containername}:3002`;
 
     res.send(`Bot started for meeting`);
   } catch (err) {
@@ -57,13 +57,15 @@ app.post("/submit-link", async (req, res) => {
 // API สำหรับสั่งบอทส่งข้อความแชท (ต้องออกแบบเพิ่มฝั่งบอทให้รับคำสั่งนี้)
 app.post("/send-message", async (req, res) => {
   const { meeting_code, message } = req.body;
-  if (!meeting_code || !message) return res.status(400).json({ error: "Missing jobId or message" });
+  if (!meeting_code || !message)
+    return res.status(400).json({ error: "Missing jobId or message" });
 
   const botApiUrl = botEndpoints[`meetingbot-${meeting_code}`];
-  if (!botApiUrl) return res.status(404).json({ error: "Bot container not found" });
+  if (!botApiUrl)
+    return res.status(404).json({ error: "Bot container not found" });
 
   try {
-      const response = await fetch(`${botApiUrl}/send-message`, {
+    const response = await fetch(`${botApiUrl}/send-message`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),

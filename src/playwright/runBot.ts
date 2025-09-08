@@ -1,10 +1,8 @@
-import { BrowserContext, chromium } from "playwright";
-import { expect } from '@playwright/test';
+import { BrowserContext, chromium, Page } from "playwright";
+import { expect } from "@playwright/test";
 import { saveTranscriptBatch } from "../storage";
 import { v4 as uuidv4 } from "uuid";
-import { Page } from "playwright";
 import { Segment } from "src/models";
-
 
 // bot will leave the meeting immediately if it hears any of the following phrases
 const EXIT_PHRASES = [
@@ -23,7 +21,7 @@ const LEAVE_BANNER_SEL =
   'body > div[role="heading"]:has-text("You’ve left the call")';
 
 // launches broswer, joins Google Meet, records captions
-export async function runBot(url: string): Promise<{ meetingId: string; page: Page }>{
+export async function runBot(url: string): Promise<{ meetingId: string }> {
   const meetingId = uuidv4();
   const createdAt = new Date();
 
@@ -77,14 +75,13 @@ export async function runBot(url: string): Promise<{ meetingId: string; page: Pa
     await selectCaptionsLanguage(page, "Thai (Thailand)"); // หรือ "ไทย" หรือภาษาที่ต้องการ
     console.log("captions set language to Thai (Thailand)");
 
-    await sendMessageInChat(page, 'ฉันพร้อมแล้วค่ะ');
+    await sendMessageInChat(page, "ฉันพร้อมแล้วค่ะ");
     // scrape captions
     const mid = await scrapeCaptions(page, meetingId, createdAt);
     console.log("done scraping. Returning meetingId.");
 
-
     await context.tracing.stop({ path: "run.zip" });
-    return {mid, page};
+    return { meetingId };
   } catch (err) {
     throw new Error(`Run Bot error: ${err}`);
   }
@@ -158,28 +155,24 @@ async function scrapeCaptions(
     },
   );
 
+  // ฟังก์ชันรับ Chat จากฝั่ง browser
+  await page.exposeFunction("onChat", async (sender: string, text: string) => {
+    const chatText = text.trim();
+    if (!chatText) return;
 
-    // ฟังก์ชันรับ Chat จากฝั่ง browser
-  await page.exposeFunction(
-    "onChat",
-    async (sender: string, text: string) => {
-      const chatText = text.trim();
-      if (!chatText) return;
+    const normalized = chatText.toLowerCase();
+    const isExit = EXIT_PHRASES.some((p) => normalized.includes(p));
+    if (isExit) {
+      console.log("Exit phrase heard (chat) — hanging up");
+      exitRequested = true;
+    }
 
-      const normalized = chatText.toLowerCase();
-      const isExit = EXIT_PHRASES.some((p) => normalized.includes(p));
-      if (isExit) {
-        console.log("Exit phrase heard (chat) — hanging up");
-        exitRequested = true;
-      }
+    // เก็บข้อความ chat ไว้ หรือประมวลผลตามต้องการ
+    chatMessages.push({ sender, text: chatText });
 
-      // เก็บข้อความ chat ไว้ หรือประมวลผลตามต้องการ
-      chatMessages.push({ sender, text: chatText });
-
-      // ตัวอย่าง log
-      console.log(`[Chat] ${sender}: ${chatText}`);
-    },
-  );
+    // ตัวอย่าง log
+    console.log(`[Chat] ${sender}: ${chatText}`);
+  });
 
   // wait for captions to be initialized
   await page.waitForSelector("[aria-live]");
@@ -248,16 +241,16 @@ async function scrapeCaptions(
   // inject observer ดักจับ chat และส่งไป onChat
   await page.waitForSelector('div[jsname="xySENc"]');
   await page.evaluate(() => {
-    let lastSender = 'Unknown Sender';
+    let lastSender = "Unknown Sender";
 
     function getSender(node: HTMLElement): string {
-      const senderElem = node.querySelector('.poVWob');
+      const senderElem = node.querySelector(".poVWob");
       return senderElem?.textContent?.trim() || lastSender;
     }
 
     function getText(node: HTMLElement): string {
       const textElem = node.querySelector('div[jsname="dTKtvb"]');
-      return textElem?.textContent?.trim() || '';
+      return textElem?.textContent?.trim() || "";
     }
 
     function sendChat(node: HTMLElement): void {
@@ -270,22 +263,22 @@ async function scrapeCaptions(
       }
     }
 
-    new MutationObserver(mutations => {
+    new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of Array.from(mutation.addedNodes)) {
           if (node instanceof HTMLElement) {
-            if (node.classList.contains('Ss4fHf')) {
+            if (node.classList.contains("Ss4fHf")) {
               sendChat(node);
             }
           }
         }
 
         if (
-          mutation.type === 'characterData' &&
+          mutation.type === "characterData" &&
           mutation.target?.parentElement instanceof HTMLElement
         ) {
           const parent = mutation.target.parentElement;
-          if (parent.classList.contains('Ss4fHf')) {
+          if (parent.classList.contains("Ss4fHf")) {
             sendChat(parent);
           }
         }
@@ -573,42 +566,49 @@ async function ensureCaptionsOn(page: Page, timeoutMs = 60_000) {
   throw new Error("could not enable captions using Shift+C or button");
 }
 
-async function selectCaptionsLanguage(page: Page, language: string): Promise<void> {
-  console.log('Starting to select captions language via Settings dialog...');
+async function selectCaptionsLanguage(
+  page: Page,
+  language: string,
+): Promise<void> {
+  console.log("Starting to select captions language via Settings dialog...");
 
   const moreOptionsButton = page
-    .getByRole('region', { name: 'Call controls' })
-    .getByLabel('More options')
+    .getByRole("region", { name: "Call controls" })
+    .getByLabel("More options")
     .filter({ visible: true });
-  console.log('Clicking More options button');
+  console.log("Clicking More options button");
   await moreOptionsButton.first().click();
 
-  const settingsMenuItem = page.getByRole('menuitem', { name: 'Settings' });
+  const settingsMenuItem = page.getByRole("menuitem", { name: "Settings" });
   await expect(settingsMenuItem).toBeVisible();
-  console.log('Clicking Settings menu item');
+  console.log("Clicking Settings menu item");
   await settingsMenuItem.click();
 
-  const captionsTab = page.getByRole('tab', { name: 'Captions' });
+  const captionsTab = page.getByRole("tab", { name: "Captions" });
   await expect(captionsTab).toBeVisible();
-  console.log('Clicking Captions tab');
+  console.log("Clicking Captions tab");
   await captionsTab.click();
 
-  const languageCombo = page.getByRole('combobox', { name: 'Language of the meeting' }).locator('div');
+  const languageCombo = page
+    .getByRole("combobox", { name: "Language of the meeting" })
+    .locator("div");
   await expect(languageCombo).toBeVisible();
-  console.log('Opening language combobox');
+  console.log("Opening language combobox");
   await languageCombo.click();
 
-  const thaiOption = page.getByRole('option', { name: language });
+  const thaiOption = page.getByRole("option", { name: language });
   await expect(thaiOption).toBeVisible();
   console.log(`Set to "${language}"`);
   await thaiOption.click();
 
-  const closeDialogButton = page.getByRole('button', { name: 'Close dialog' });
+  const closeDialogButton = page.getByRole("button", { name: "Close dialog" });
   await expect(closeDialogButton).toBeVisible();
-  console.log('Closing settings dialog');
+  console.log("Closing settings dialog");
   await closeDialogButton.click();
 
-  console.log(`Captions language successfully set to "${language}" via Settings dialog.`);
+  console.log(
+    `Captions language successfully set to "${language}" via Settings dialog.`,
+  );
 }
 
 /**
@@ -617,20 +617,22 @@ async function selectCaptionsLanguage(page: Page, language: string): Promise<voi
  * @param message - ข้อความที่ต้องการส่ง
  */
 export async function sendMessageInChat(page: Page, message: string) {
-  const chatButton = page.getByRole('button', { name: 'Chat with everyone' });
+  const chatButton = page.getByRole("button", { name: "Chat with everyone" });
   await expect(chatButton).toBeVisible();
-  console.log('พบปุ่ม Chat with everyone และกำลังคลิก...');
+  console.log("พบปุ่ม Chat with everyone และกำลังคลิก...");
   await chatButton.click();
 
-  const chatInput = page.getByRole('textbox', { name: 'Send a message' });
+  const chatInput = page.getByRole("textbox", { name: "Send a message" });
   await expect(chatInput).toBeVisible();
   console.log(`กรอกข้อความ: "${message}"`);
   await chatInput.fill(message);
 
-  const sendMessageButton = page.getByRole('button', { name: 'Send a message' });
+  const sendMessageButton = page.getByRole("button", {
+    name: "Send a message",
+  });
   await expect(sendMessageButton).toBeVisible();
-  console.log('กดปุ่ม Send a message เพื่อส่งข้อความ...');
+  console.log("กดปุ่ม Send a message เพื่อส่งข้อความ...");
   await sendMessageButton.click();
 
-  console.log('ส่งข้อความเรียบร้อยแล้ว');
+  console.log("ส่งข้อความเรียบร้อยแล้ว");
 }
